@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>영화연대기</title>
+<style>
+  :root{
+    --bg:#0b0c10; --panel:#15171c; --card:#1c1f26; --line:#2a2e37;
+    --kr:#e2543b; --world:#3b82c4; --text:#eef0f3; --sub:#9aa0ac;
+    --gold:#d4af37;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:var(--bg); color:var(--text);}
+  header{position:sticky; top:0; z-index:20; background:var(--bg); padding:16px 16px 10px; text-align:center; border-bottom:1px solid var(--line);}
+  header h1{margin:0 0 4px; font-size:19px; letter-spacing:2px;}
+  header p{margin:0; font-size:11px; color:var(--sub);}
+  .stats{margin-top:8px; font-size:12px; color:var(--gold);}
+  .legend{display:flex; justify-content:center; gap:16px; margin-top:8px; font-size:11px; color:var(--sub);}
+  .legend span{display:flex; align-items:center; gap:5px;}
+  .dot{width:8px; height:8px; border-radius:50%;}
+  .dot.kr{background:var(--kr);} .dot.world{background:var(--world);}
+
+  .wrap{max-width:820px; margin:0 auto; padding:14px 12px 60px;}
+
+  .decade{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    margin-bottom:10px; overflow:hidden;
+  }
+  .decade-head{
+    padding:14px 16px; display:flex; justify-content:space-between; align-items:center;
+    cursor:pointer; user-select:none;
+  }
+  .decade-head .label{font-size:15px; font-weight:700; letter-spacing:1px;}
+  .decade-head .arrow{color:var(--sub); font-size:13px; transition:transform .2s;}
+  .decade.open .arrow{transform:rotate(90deg);}
+  .decade-body{display:none; padding:0 12px 12px;}
+  .decade.open .decade-body{display:block;}
+
+  .year-block{margin-top:10px; border-top:1px dashed var(--line); padding-top:10px;}
+  .year-head{font-size:13px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:8px;}
+  .year-head b{color:var(--text); font-size:14px;}
+  .year-loading{font-size:11px; color:var(--sub);}
+
+  .cmp{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  @media(max-width:520px){.cmp{grid-template-columns:1fr;}}
+  .col-title{font-size:10px; color:var(--sub); margin-bottom:4px; text-align:center;}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-left:3px solid var(--world);
+    border-radius:8px; padding:8px 10px; margin-bottom:6px; cursor:pointer;
+  }
+  .card.kr{border-left-color:var(--kr);}
+  .card .row{display:flex; justify-content:space-between; align-items:center; gap:6px;}
+  .card .t{font-size:13px; font-weight:600;}
+  .card .badges{display:flex; gap:4px; align-items:center;}
+  .badge{font-size:10px; background:var(--gold); color:#000; padding:1px 5px; border-radius:8px; font-weight:700;}
+  .watch-check{width:16px; height:16px; accent-color:var(--gold); cursor:pointer;}
+  .detail{font-size:11px; color:var(--sub); margin-top:5px; line-height:1.5; display:none;}
+  .card.expanded .detail{display:block;}
+  .empty{font-size:11px; color:var(--sub); text-align:center; padding:6px 0;}
+
+  footer{text-align:center; color:var(--sub); font-size:10px; padding:20px; opacity:0.6;}
+
+  .decade-stats{font-size:10px; color:var(--sub); margin-right:8px;}
+  .decade-stats.done{color:var(--gold); font-weight:700;}
+
+  .modal-bg{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:50;
+    align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto;
+  }
+  .modal-bg.open{display:flex;}
+  .modal{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    max-width:480px; width:100%; padding:16px; max-height:80vh; overflow-y:auto;
+  }
+  .modal h3{margin:0 0 10px; font-size:15px;}
+  .modal .close{float:right; cursor:pointer; color:var(--sub); font-size:13px;}
+  .modal .fm-item{font-size:12px; color:var(--sub); padding:6px 0; border-bottom:1px dashed var(--line);}
+  .modal .fm-item b{color:var(--text);}
+  .fm-loading{font-size:11px; color:var(--sub); text-align:center; padding:10px;}
+  .director-link{color:var(--gold); text-decoration:underline; cursor:pointer;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>영화연대기</h1>
+  <p>1891 — 현재 · TMDb 데이터 기반 자동 연대표</p>
+  <div class="stats">체크한 영화 <b id="watchedCount">0</b>편</div>
+  <div class="legend">
+    <span><i class="dot kr"></i>한국 영화</span>
+    <span><i class="dot world"></i>해외 영화</span>
+    <span><i class="badge" style="border-radius:3px; padding:1px 4px;">🏆</i>수상작</span>
+  </div>
+</header>
+
+<div class="wrap" id="wrap"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <span class="close" id="modalClose">닫기 ✕</span>
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<footer>
+  This product uses the TMDB API but is not endorsed or certified by TMDB.<br>
+  1차 버전 · 감독/주연 정보는 카드를 클릭하면 불러옵니다
+</footer>
+
+<script>
+const API_KEY = "d0851d95b0ffad539166473b178fa770";
+const BASE = "https://api.themoviedb.org/3";
+const CURRENT_YEAR = new Date().getFullYear();
+const START_YEAR = 1891;
+
+// 아주 느슨한 수상작 큐레이션 (오스카 작품상 / 칸 황금종려상 / 베를린 황금곰상 일부, 계속 확장 예정)
+const AWARDS = [
+  {y:1928, k:"wings"}, {y:1931, k:"cimarron"}, {y:1935, k:"mutiny on the bounty"},
+  {y:1939, k:"gone with the wind"}, {y:1942, k:"mrs. miniver"}, {y:1946, k:"best years of our lives"},
+  {y:1950, k:"all about eve"}, {y:1954, k:"on the waterfront"}, {y:1957, k:"bridge on the river kwai"},
+  {y:1959, k:"ben-hur"}, {y:1960, k:"apartment"}, {y:1962, k:"lawrence of arabia"},
+  {y:1966, k:"man for all seasons"}, {y:1969, k:"midnight cowboy"}, {y:1972, k:"godfather"},
+  {y:1974, k:"godfather part ii"}, {y:1975, k:"one flew over"}, {y:1977, k:"annie hall"},
+  {y:1979, k:"kramer vs"}, {y:1980, k:"ordinary people"}, {y:1982, k:"gandhi"},
+  {y:1985, k:"out of africa"}, {y:1990, k:"dances with wolves"}, {y:1991, k:"silence of the lambs"},
+  {y:1993, k:"schindler's list"}, {y:1994, k:"forrest gump"}, {y:1997, k:"titanic"},
+  {y:1999, k:"american beauty"}, {y:2002, k:"chicago"}, {y:2003, k:"lord of the rings"},
+  {y:2006, k:"departed"}, {y:2008, k:"slumdog millionaire"}, {y:2010, k:"king's speech"},
+  {y:2012, k:"argo"}, {y:2014, k:"birdman"}, {y:2016, k:"moonlight"},
+  {y:2019, k:"parasite"}, {y:1926, k:"아리랑"}, {y:1960, k:"오발탄"}, {y:1961, k:"하녀"},
+  {y:1963, k:"마부"}, {y:2000, k:"박하사탕"}, {y:2003, k:"올드보이"}, {y:2019, k:"기생충"}
+];
+function checkAward(m){
+  const title = (m.original_title || m.title || "").toLowerCase();
+  return AWARDS.some(a => a.y === m._year && title.includes(a.k));
+}
+
+// 감상 체크리스트 (localStorage)
+let watched = new Set(JSON.parse(localStorage.getItem('mc_watched') || '[]'));
+function saveWatched(){
+  localStorage.setItem('mc_watched', JSON.stringify([...watched]));
+  document.getElementById('watchedCount').textContent = watched.size;
+}
+saveWatched();
+
+const wrap = document.getElementById('wrap');
+const detailCache = {};
+const yearCache = {};
+
+function buildDecades(){
+  const decades = [];
+  for(let d = Math.floor(START_YEAR/10)*10; d <= Math.floor(CURRENT_YEAR/10)*10; d += 10){
+    decades.push(d);
+  }
+  return decades;
+}
+
+async function fetchYear(year){
+  if(yearCache[year]) return yearCache[year];
+  const common = `api_key=${API_KEY}&language=ko-KR&sort_by=vote_count.desc&primary_release_year=${year}`;
+  const [krRes, worldRes] = await Promise.all([
+    fetch(`${BASE}/discover/movie?${common}&with_origin_country=KR&vote_count.gte=3`).then(r=>r.json()),
+    fetch(`${BASE}/discover/movie?${common}&vote_count.gte=20`).then(r=>r.json())
+  ]);
+  const kr = (krRes.results || []).map(m=>({...m, _year:year, _country:'kr'}));
+  const world = (worldRes.results || []).filter(m => !kr.find(k=>k.id===m.id))
+                .map(m=>({...m, _year:year, _country:'world'}));
+  const data = {kr, world};
+  yearCache[year] = data;
+  return data;
+}
+
+async function fetchDetail(id){
+  if(detailCache[id]) return detailCache[id];
+  const res = await fetch(`${BASE}/movie/${id}/credits?api_key=${API_KEY}&language=ko-KR`).then(r=>r.json());
+  const director = (res.crew||[]).find(p=>p.job==='Director');
+  const cast = (res.cast||[]).slice(0,2).map(c=>({id:c.id, name:c.name}));
+  const data = {
+    director: director ? director.name : '정보 없음',
+    directorId: director ? director.id : null,
+    cast
+  };
+  detailCache[id] = data;
+  return data;
+}
+
+// 감독/배우 필모그래피 서브 타임라인
+const filmoCache = {};
+async function openFilmography(personId, personName, mode){
+  // mode: 'director' | 'cast'
+  const modalBg = document.getElementById('modalBg');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  modalTitle.textContent = mode === 'cast' ? `${personName} 출연작` : `${personName} 필모그래피`;
+  modalBody.innerHTML = '<div class="fm-loading">불러오는 중...</div>';
+  modalBg.classList.add('open');
+
+  const cacheKey = `${personId}_${mode}`;
+  let list = filmoCache[cacheKey];
+  if(!list){
+    const res = await fetch(`${BASE}/person/${personId}/movie_credits?api_key=${API_KEY}&language=ko-KR`).then(r=>r.json());
+    if(mode === 'cast'){
+      list = (res.cast || []).filter(c => c.release_date)
+              .sort((a,b)=> a.release_date.localeCompare(b.release_date));
+    } else {
+      list = (res.crew || []).filter(c => c.job === 'Director' && c.release_date)
+              .sort((a,b)=> a.release_date.localeCompare(b.release_date));
+    }
+    filmoCache[cacheKey] = list;
+  }
+  if(list.length === 0){
+    modalBody.innerHTML = '<div class="fm-loading">작품 정보를 찾지 못했어요</div>';
+    return;
+  }
+  modalBody.innerHTML = list.map(m => `
+    <div class="fm-item"><b>${(m.release_date||'').slice(0,4)}</b> · ${m.title || m.original_title}</div>
+  `).join('');
+}
+document.getElementById('modalClose').addEventListener('click', ()=>{
+  document.getElementById('modalBg').classList.remove('open');
+});
+document.getElementById('modalBg').addEventListener('click', (e)=>{
+  if(e.target.id === 'modalBg') document.getElementById('modalBg').classList.remove('open');
+});
+
+// 시대별 감상 챌린지 (체크율)
+const decadeStats = {};
+function updateDecadeBadge(decade){
+  const el = document.querySelector(`.decade-stats[data-decade="${decade}"]`);
+  if(!el) return;
+  const s = decadeStats[decade];
+  if(!s || s.total === 0){ el.textContent = ''; return; }
+  el.textContent = `✓ ${s.checked}/${s.total}`;
+  el.classList.toggle('done', s.total >= 5 && s.checked === s.total);
+  if(s.total >= 5 && s.checked === s.total) el.textContent += ' 🏅완주';
+}
+function registerToDecade(decade, id, isChecked){
+  decadeStats[decade] = decadeStats[decade] || {total:0, checked:0};
+  decadeStats[decade].total++;
+  if(isChecked) decadeStats[decade].checked++;
+  updateDecadeBadge(decade);
+}
+function toggleDecadeChecked(decade, wasChecked){
+  decadeStats[decade].checked += wasChecked ? 1 : -1;
+  updateDecadeBadge(decade);
+}
+
+function movieCard(m, decade){
+  const div = document.createElement('div');
+  div.className = 'card ' + (m._country === 'kr' ? 'kr' : '');
+  const isAward = checkAward(m);
+  const isChecked = watched.has(m.id);
+  div.innerHTML = `
+    <div class="row">
+      <div class="t">${m.title || m.original_title}</div>
+      <div class="badges">
+        ${isAward ? '<span class="badge">🏆</span>' : ''}
+        <input type="checkbox" class="watch-check" ${isChecked?'checked':''}>
+      </div>
+    </div>
+    <div class="detail">불러오는 중...</div>
+  `;
+  if(decade !== undefined) registerToDecade(decade, m.id, isChecked);
+
+  const checkbox = div.querySelector('.watch-check');
+  checkbox.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if(checkbox.checked) watched.add(m.id); else watched.delete(m.id);
+    saveWatched();
+    if(decade !== undefined) toggleDecadeChecked(decade, checkbox.checked);
+  });
+  div.addEventListener('click', async ()=>{
+    const wasOpen = div.classList.contains('expanded');
+    div.classList.toggle('expanded');
+    if(!wasOpen){
+      const detailEl = div.querySelector('.detail');
+      const d = await fetchDetail(m.id);
+      const castHtml = d.cast.length
+        ? d.cast.map(c => c.id
+            ? `<span class="director-link" data-pid="${c.id}">${c.name}</span>`
+            : c.name).join(', ')
+        : '정보 없음';
+      if(d.directorId){
+        detailEl.innerHTML = `감독 <span class="director-link" data-pid="${d.directorId}" data-mode="director">${d.director}</span> · 주연 ${castHtml}`;
+      } else {
+        detailEl.innerHTML = `감독 ${d.director} · 주연 ${castHtml}`;
+      }
+      detailEl.querySelectorAll('.director-link').forEach(el=>{
+        el.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          openFilmography(el.dataset.pid, el.textContent, el.dataset.mode === 'director' ? 'director' : 'cast');
+        });
+      });
+    }
+  });
+  return div;
+}
+
+function renderYearBlock(container, year, decade){
+  const block = document.createElement('div');
+  block.className = 'year-block';
+  block.innerHTML = `<div class="year-head"><b>${year}년</b><span class="year-loading">불러오는 중...</span></div>`;
+  container.appendChild(block);
+
+  const observer = new IntersectionObserver((entries)=>{
+    entries.forEach(async entry=>{
+      if(entry.isIntersecting){
+        observer.disconnect();
+        const {kr, world} = await fetchYear(year);
+        const loadingEl = block.querySelector('.year-loading');
+        if(kr.length === 0 && world.length === 0){
+          loadingEl.textContent = '';
+          block.innerHTML += '<div class="empty">등록된 정보가 없어요</div>';
+          return;
+        }
+        loadingEl.remove();
+        const cmp = document.createElement('div');
+        cmp.className = 'cmp';
+        const krCol = document.createElement('div');
+        krCol.innerHTML = '<div class="col-title">한국</div>';
+        if(kr.length===0) krCol.innerHTML += '<div class="empty">-</div>';
+        kr.forEach(m => krCol.appendChild(movieCard(m, decade)));
+        const worldCol = document.createElement('div');
+        worldCol.innerHTML = '<div class="col-title">해외</div>';
+        if(world.length===0) worldCol.innerHTML += '<div class="empty">-</div>';
+        world.forEach(m => worldCol.appendChild(movieCard(m, decade)));
+        cmp.appendChild(krCol);
+        cmp.appendChild(worldCol);
+        block.appendChild(cmp);
+      }
+    });
+  }, {rootMargin: '200px'});
+  observer.observe(block);
+}
+
+function renderDecade(decade){
+  const wrapDecade = document.createElement('div');
+  wrapDecade.className = 'decade';
+  wrapDecade.innerHTML = `
+    <div class="decade-head">
+      <div class="label">${decade}년대</div>
+      <div style="display:flex; align-items:center;">
+        <span class="decade-stats" data-decade="${decade}"></span>
+        <span class="arrow">▶</span>
+      </div>
+    </div>
+    <div class="decade-body"></div>
+  `;
+  const head = wrapDecade.querySelector('.decade-head');
+  const body = wrapDecade.querySelector('.decade-body');
+  let built = false;
+  head.addEventListener('click', ()=>{
+    wrapDecade.classList.toggle('open');
+    if(!built){
+      built = true;
+      const endYear = Math.min(decade+9, CURRENT_YEAR);
+      for(let y = Math.max(decade, START_YEAR); y <= endYear; y++){
+        renderYearBlock(body, y, decade);
+      }
+    }
+  });
+  wrap.appendChild(wrapDecade);
+}
+
+buildDecades().forEach(renderDecade);
+</script>
+
+</body>
+</html>
